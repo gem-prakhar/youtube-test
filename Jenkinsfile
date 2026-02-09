@@ -86,6 +86,7 @@ pipeline {
                         } else {
                             echo "Rerun build failed. Parent build remains UNSTABLE/FAILURE."
                             currentBuild.result = 'FAILURE'
+                        }
                     } else {
                         echo "No failed scenarios. No rerun needed."
                     }
