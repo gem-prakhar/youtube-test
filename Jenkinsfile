@@ -1,9 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        jdk 'JDK11' // Configure in Jenkins Global Tool Configuration
-    }
 
     environment {
         GRADLE_HOME = tool name: 'Gradle', type: 'gradle'
