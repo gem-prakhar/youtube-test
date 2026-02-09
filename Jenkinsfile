@@ -71,7 +71,7 @@ pipeline {
                         echo "Failed scenarios detected. Triggering rerun build."
                         echo "Failed scenarios: ${rerunFile}"
 
-                        build job: env.JOB_NAME,
+                        def rerunBuild = build job: env.JOB_NAME,
                               parameters: [
                                   booleanParam(name: 'RERUN_ONLY', value: true)
                               ],
