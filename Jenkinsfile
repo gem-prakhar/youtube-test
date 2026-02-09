@@ -23,7 +23,6 @@ pipeline {
                     if (params.RERUN_ONLY) {
                         echo "Running only failed scenarios from previous run"
 
-                        // Copy the rerun file from upstream build artifacts
                         copyArtifacts(
                             projectName: env.JOB_NAME,
                             selector: upstream(fallbackToLastSuccessful: false),
@@ -31,7 +30,6 @@ pipeline {
                             optional: false
                         )
 
-                        // Verify the file was copied
                         bat "dir target"
                         bat "type target\\rerun.txt"
 
@@ -77,7 +75,17 @@ pipeline {
                               parameters: [
                                   booleanParam(name: 'RERUN_ONLY', value: true)
                               ],
-                              wait: false
+                              wait: true,
+                              propagate: false
+
+                        echo "Rerun build #${rerunBuild.number} completed with result: ${rerunBuild.result}"
+
+                        if (rerunBuild.result == 'SUCCESS') {
+                            echo "Rerun build passed! Marking parent build as SUCCESS."
+                            currentBuild.result = 'SUCCESS'
+                        } else {
+                            echo "Rerun build failed. Parent build remains UNSTABLE/FAILURE."
+                            currentBuild.result = 'FAILURE'
                     } else {
                         echo "No failed scenarios. No rerun needed."
                     }
