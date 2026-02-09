@@ -27,13 +27,13 @@ pipeline {
                 script {
                     if (params.RERUN_ONLY && params.FAILED_TESTS?.trim()) {
                         echo "Running only failed tests"
-                        sh """
+                        bat """
                             ./gradlew clean test \
                             -PfailedTests="${params.FAILED_TESTS}"
                         """
                     } else {
                         echo "Running full test suite"
-                        sh "./gradlew clean test"
+                        bat "./gradlew clean test"
                     }
                 }
             }
