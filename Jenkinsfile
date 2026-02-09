@@ -23,17 +23,29 @@ pipeline {
                     if (params.RERUN_ONLY) {
                         echo "Running only failed scenarios from previous run"
 
-                        // Copy the rerun file from upstream build artifacts
-                        copyArtifacts(
-                            projectName: env.JOB_NAME,
-                            selector: upstream(fallbackToLastSuccessful: false),
-                            filter: 'target/rerun.txt',
-                            optional: false
-                        )
+                        // Get the upstream build number that triggered this build
+                        def upstreamBuildNumber = currentBuild.upstreamBuilds?.first()?.buildNumber
 
-                        // Verify the file was copied
-                        bat "dir target"
-                        bat "type target\\rerun.txt"
+                        if (upstreamBuildNumber) {
+                            echo "Copying rerun.txt from build #${upstreamBuildNumber}"
+
+                            // Create target directory if it doesn't exist
+                            bat "if not exist target mkdir target"
+
+                            // Copy the rerun.txt from the upstream build's archived artifacts
+                            def rerunFilePath = "${env.JENKINS_HOME}\\jobs\\${env.JOB_NAME}\\builds\\${upstreamBuildNumber}\\archive\\target\\rerun.txt"
+
+                            bat """
+                                echo Copying from: ${rerunFilePath}
+                                copy "${rerunFilePath}" target\\rerun.txt
+                            """
+
+                            // Verify the file was copied
+                            bat "dir target"
+                            bat "type target\\rerun.txt"
+                        } else {
+                            echo "Warning: Could not determine upstream build number"
+                        }
 
                         bat """
                             gradlew.bat clean test -PrerunFailedTests=true
