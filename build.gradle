@@ -1,0 +1,55 @@
+plugins {
+    id 'java'
+    id 'net.serenity-bdd.serenity-gradle-plugin' version '4.0.1'
+    id 'org.gradle.test-retry' version '1.5.8'
+}
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+serenity {
+    requirementsDir = "src/test/resources/features"
+}
+
+dependencies {
+    // Serenity BDD with Cucumber
+    testImplementation 'net.serenity-bdd:serenity-core:4.0.1'
+    testImplementation 'net.serenity-bdd:serenity-cucumber:4.0.1'
+    testImplementation 'net.serenity-bdd:serenity-screenplay:4.0.1'
+    testImplementation 'net.serenity-bdd:serenity-screenplay-webdriver:4.0.1'
+    testImplementation 'net.serenity-bdd:serenity-ensure:4.0.1'
+
+    // Cucumber
+    testImplementation 'io.cucumber:cucumber-java:7.14.0'
+    testImplementation 'io.cucumber:cucumber-junit:7.14.0'
+
+    // JUnit
+    testImplementation 'junit:junit:4.13.2'
+
+    // Selenium WebDriver
+    testImplementation 'org.seleniumhq.selenium:selenium-java:4.16.1'
+
+    // Logging
+    testImplementation 'org.slf4j:slf4j-simple:2.0.9'
+}
+
+test {
+    testLogging.showStandardStreams = true
+    systemProperties System.getProperties()
+
+    retry {
+        maxRetries = 2
+        maxFailures = 10
+        failOnPassedAfterRetry = false
+    }
+
+    outputs.upToDateWhen { false }
+
+}
+
+gradle.startParameter.continueOnFailure = true
+
