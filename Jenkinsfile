@@ -7,11 +7,6 @@ pipeline {
             defaultValue: false,
             description: 'Run only failed tests from previous build'
         )
-        string(
-            name: 'FAILED_TESTS',
-            defaultValue: '',
-            description: 'List of failed tests (Class#method)'
-        )
     }
 
     stages {
@@ -25,11 +20,10 @@ pipeline {
         stage('Test') {
             steps {
                 script {
-                    if (params.RERUN_ONLY && params.FAILED_TESTS?.trim()) {
-                        echo "Running only failed tests"
+                    if (params.RERUN_ONLY) {
+                        echo "Running only failed scenarios from previous run"
                         bat """
-                            gradlew.bat clean test \
-                            -PfailedTests="${params.FAILED_TESTS}"
+                            gradlew.bat clean test -PrerunFailedTests=true
                         """
                     } else {
                         echo "Running full test suite"
@@ -39,7 +33,11 @@ pipeline {
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'build/failed-tests.txt', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'target/rerun.txt', allowEmptyArchive: true
+
+                    archiveArtifacts artifacts: 'target/site/serenity/**/*', allowEmptyArchive: true
+
+                    junit allowEmptyResults: true, testResults: 'target/cucumber-reports/cucumber.xml'
                 }
             }
         }
@@ -48,27 +46,41 @@ pipeline {
             when {
                 allOf {
                     expression { !params.RERUN_ONLY }
-                    expression { fileExists('build/failed-tests.txt') }
+                    expression { fileExists('target/rerun.txt') }
                 }
             }
             steps {
                 script {
-                    def failedTests = readFile('build/failed-tests.txt').trim()
+                    def rerunFile = readFile('target/rerun.txt').trim()
 
-                    if (failedTests) {
-                        echo "Failed tests detected. Triggering one rerun build."
+                    if (rerunFile) {
+                        echo "Failed scenarios detected. Triggering rerun build."
+                        echo "Failed scenarios: ${rerunFile}"
 
                         build job: env.JOB_NAME,
                               parameters: [
-                                  booleanParam(name: 'RERUN_ONLY', value: true),
-                                  string(name: 'FAILED_TESTS', value: failedTests)
+                                  booleanParam(name: 'RERUN_ONLY', value: true)
                               ],
                               wait: false
                     } else {
-                        echo "No failed tests. No rerun needed."
+                        echo "No failed scenarios. No rerun needed."
                     }
                 }
             }
+        }
+    }
+
+    post {
+        always {
+            publishHTML([
+                allowMissing: false,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'target/site/serenity',
+                reportFiles: 'index.html',
+                reportName: 'Serenity Report',
+                reportTitles: ''
+            ])
         }
     }
 }

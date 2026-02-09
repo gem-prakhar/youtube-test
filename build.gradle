@@ -41,23 +41,17 @@ test {
     systemProperties System.getProperties()
     ignoreFailures = true
 
-    afterTest { desc, result ->
-        if (result.resultType == TestResult.ResultType.FAILURE) {
-            file("$buildDir/failed-tests.txt") << "${desc.className}#${desc.name}\n"
-        }
-    }
-
-    if (project.hasProperty("failedTests")) {
-        filter {
-            project.property("failedTests")
-                    .split("\n")
-                    .each { includeTestsMatching it }
+    if (project.hasProperty("rerunFailedTests")) {
+        def rerunFile = file("target/rerun.txt")
+        if (rerunFile.exists() && rerunFile.text.trim()) {
+            systemProperty "cucumber.features", "@${rerunFile.absolutePath}"
+            println "Running failed scenarios from: ${rerunFile.absolutePath}"
+        } else {
+            println "No rerun file found or file is empty. Running all tests."
         }
     }
 
     outputs.upToDateWhen { false }
-
 }
 
 gradle.startParameter.continueOnFailure = true
-
