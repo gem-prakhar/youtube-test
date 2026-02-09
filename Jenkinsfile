@@ -33,7 +33,7 @@ pipeline {
                         """
                     } else {
                         echo "Running full test suite"
-                        bat "gradlew.ba clean test"
+                        bat "gradlew.bat clean test"
                     }
                 }
             }
