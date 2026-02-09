@@ -1,10 +1,17 @@
 pipeline {
     agent any
 
-    options {
-        timestamps()
-        timeout(time: 30, unit: 'MINUTES')
-        buildDiscarder(logRotator(numToKeepStr: '10'))
+    parameters {
+        booleanParam(
+            name: 'RERUN_ONLY',
+            defaultValue: false,
+            description: 'Run only failed tests from previous build'
+        )
+        string(
+            name: 'FAILED_TESTS',
+            defaultValue: '',
+            description: 'List of failed tests (Class#method)'
+        )
     }
 
     stages {
@@ -15,75 +22,53 @@ pipeline {
             }
         }
 
-        stage('Clean') {
+        stage('Test') {
             steps {
                 script {
-                    if (isUnix()) {
-                        sh './gradlew clean'
+                    if (params.RERUN_ONLY && params.FAILED_TESTS?.trim()) {
+                        echo "Running only failed tests"
+                        sh """
+                            ./gradlew clean test \
+                            -PfailedTests="${params.FAILED_TESTS}"
+                        """
                     } else {
-                        bat 'gradlew.bat clean'
-                    }
-                }
-            }
-        }
-
-        stage('Run Serenity Tests') {
-            steps {
-                script {
-                    if (isUnix()) {
-                        sh './gradlew test --tests "org.example.runners.TestRunner"'
-                    } else {
-                        bat 'gradlew.bat test --tests "org.example.runners.TestRunner"'
+                        echo "Running full test suite"
+                        sh "./gradlew clean test"
                     }
                 }
             }
             post {
                 always {
-                    // JUnit results (won’t fail build if empty)
-                    junit allowEmptyResults: true,
-                          testResults: '**/build/test-results/test/*.xml'
+                    archiveArtifacts artifacts: 'build/failed-tests.txt', allowEmptyArchive: true
                 }
             }
         }
 
-        stage('Generate Serenity Report') {
+        stage('Trigger Rerun Build') {
+            when {
+                allOf {
+                    expression { !params.RERUN_ONLY }
+                    expression { fileExists('build/failed-tests.txt') }
+                }
+            }
             steps {
                 script {
-                    if (isUnix()) {
-                        sh './gradlew aggregate'
+                    def failedTests = readFile('build/failed-tests.txt').trim()
+
+                    if (failedTests) {
+                        echo "Failed tests detected. Triggering one rerun build."
+
+                        build job: env.JOB_NAME,
+                              parameters: [
+                                  booleanParam(name: 'RERUN_ONLY', value: true),
+                                  string(name: 'FAILED_TESTS', value: failedTests)
+                              ],
+                              wait: false
                     } else {
-                        bat 'gradlew.bat aggregate'
+                        echo "No failed tests. No rerun needed."
                     }
                 }
             }
-        }
-
-        stage('Publish Reports') {
-            steps {
-                publishHTML([
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: true,
-                    keepAll: true,
-                    reportDir: 'target/site/serenity',
-                    reportFiles: 'index.html',
-                    reportName: 'Serenity Report'
-                ])
-
-                archiveArtifacts artifacts: '**/target/site/serenity/**',
-                                 allowEmptyArchive: true
-            }
-        }
-    }
-
-    post {
-        success {
-            echo 'Pipeline executed successfully.'
-        }
-        unstable {
-            echo 'Pipeline unstable (test failures).'
-        }
-        failure {
-            echo 'Pipeline failed.'
         }
     }
 }

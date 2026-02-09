@@ -1,7 +1,6 @@
 plugins {
     id 'java'
     id 'net.serenity-bdd.serenity-gradle-plugin' version '4.0.1'
-    id 'org.gradle.test-retry' version '1.5.8'
 }
 
 group = 'org.example'
@@ -40,11 +39,20 @@ dependencies {
 test {
     testLogging.showStandardStreams = true
     systemProperties System.getProperties()
+    ignoreFailures = true
 
-    retry {
-        maxRetries = 2
-        maxFailures = 10
-        failOnPassedAfterRetry = false
+    afterTest { desc, result ->
+        if (result.resultType == TestResult.ResultType.FAILURE) {
+            file("$buildDir/failed-tests.txt") << "${desc.className}#${desc.name}\n"
+        }
+    }
+
+    if (project.hasProperty("failedTests")) {
+        filter {
+            project.property("failedTests")
+                    .split("\n")
+                    .each { includeTestsMatching it }
+        }
     }
 
     outputs.upToDateWhen { false }
