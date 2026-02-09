@@ -22,6 +22,19 @@ pipeline {
                 script {
                     if (params.RERUN_ONLY) {
                         echo "Running only failed scenarios from previous run"
+
+                        // Copy the rerun file from upstream build artifacts
+                        copyArtifacts(
+                            projectName: env.JOB_NAME,
+                            selector: upstream(fallbackToLastSuccessful: false),
+                            filter: 'target/rerun.txt',
+                            optional: false
+                        )
+
+                        // Verify the file was copied
+                        bat "dir target"
+                        bat "type target\\rerun.txt"
+
                         bat """
                             gradlew.bat clean test -PrerunFailedTests=true
                         """
@@ -33,10 +46,13 @@ pipeline {
             }
             post {
                 always {
+                    // Archive the rerun file if it exists
                     archiveArtifacts artifacts: 'target/rerun.txt', allowEmptyArchive: true
 
+                    // Archive Serenity reports
                     archiveArtifacts artifacts: 'target/site/serenity/**/*', allowEmptyArchive: true
 
+                    // Publish test results
                     junit allowEmptyResults: true, testResults: 'target/cucumber-reports/cucumber.xml'
                 }
             }
@@ -72,15 +88,22 @@ pipeline {
 
     post {
         always {
-            publishHTML([
-                allowMissing: false,
-                alwaysLinkToLastBuild: true,
-                keepAll: true,
-                reportDir: 'target/site/serenity',
-                reportFiles: 'index.html',
-                reportName: 'Serenity Report',
-                reportTitles: ''
-            ])
+            // Publish Serenity report only if it exists
+            script {
+                if (fileExists('target/site/serenity/index.html')) {
+                    publishHTML([
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'target/site/serenity',
+                        reportFiles: 'index.html',
+                        reportName: 'Serenity Report',
+                        reportTitles: ''
+                    ])
+                } else {
+                    echo "Serenity report not found, skipping HTML publishing"
+                }
+            }
         }
     }
 }
