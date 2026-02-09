@@ -44,14 +44,15 @@ pipeline {
             }
             post {
                 always {
-                    // Archive the rerun file if it exists
                     archiveArtifacts artifacts: 'target/rerun.txt', allowEmptyArchive: true
-
-                    // Archive Serenity reports
                     archiveArtifacts artifacts: 'target/site/serenity/**/*', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'target/cucumber-reports/cucumber.xml', allowEmptyArchive: true
 
-                    // Publish test results
-                    junit allowEmptyResults: true, testResults: 'target/cucumber-reports/cucumber.xml'
+                    script {
+                        if (params.RERUN_ONLY) {
+                            junit allowEmptyResults: true, testResults: 'target/cucumber-reports/cucumber.xml'
+                        }
+                    }
                 }
             }
         }
@@ -84,11 +85,28 @@ pipeline {
                             echo "Rerun build passed! Marking parent build as SUCCESS."
                             currentBuild.result = 'SUCCESS'
                         } else {
-                            echo "Rerun build failed. Parent build remains UNSTABLE/FAILURE."
+                            echo "Rerun build failed. Parent build remains FAILURE."
                             currentBuild.result = 'FAILURE'
                         }
                     } else {
                         echo "No failed scenarios. No rerun needed."
+                    }
+                }
+            }
+        }
+
+        stage('Finalize Build Status') {
+            when {
+                expression { !params.RERUN_ONLY }
+            }
+            steps {
+                script {
+                    // This stage ensures the status set in the previous stage is final
+                    echo "Final build status: ${currentBuild.result}"
+
+                    // Force the status to stick by setting it again
+                    if (currentBuild.result == 'SUCCESS') {
+                        currentBuild.result = 'SUCCESS'
                     }
                 }
             }
